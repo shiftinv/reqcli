@@ -1,0 +1,17 @@
+[run]
+source = constructutils
+
+[report]
+precision = 2
+show_missing = true
+exclude_lines =
+    pragma: no cover
+
+    def __repr__
+    def __str__
+
+    @overload
+    @abstractmethod
+
+    raise AssertionError
+    raise NotImplementedError
