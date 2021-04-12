@@ -30,7 +30,7 @@ class BaseTypeLoadable(BaseType, ABC):
         return self.load_stream(io.BytesIO(data), config)
 
     def load_stream(self: _T, stream: BinaryIO, config: Optional[TypeLoadConfig] = None) -> _T:
-        return self.load(reader.IOReader(stream, Configuration.default_chunk_size, None), config)
+        return self.load(reader.IOReader(stream, None), config)
 
     def load(self: _T, reader: reader.Reader, config: Optional[TypeLoadConfig] = None) -> _T:
         if self.__loaded:

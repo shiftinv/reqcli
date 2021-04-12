@@ -1,10 +1,13 @@
+import io
 import os
 import json
 import time
+import shutil
 import requests
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Callable, Iterable, Iterator, Optional, Dict, List, BinaryIO, Type
+from typing import Callable, Iterable, Optional, Dict, List, BinaryIO, Type, cast
 
 from .utils import misc
 
@@ -42,59 +45,49 @@ class Metadata:
         )
 
 
-class Reader(Iterator[bytes], ABC):
-    size: Optional[int]  # *compressed* size (for HTTP responses), see `SourceConfig.chunk_size`
+class Reader(ABC, io.IOBase):
+    size: Optional[int]  # *compressed* size (for HTTP responses)
     metadata: Optional[Metadata]
 
     def __init__(self, size: Optional[int], meta: Optional[Metadata]):
         self.size = size
         self.metadata = meta
 
-    def read_all(self) -> bytes:
-        return b''.join(self)
+    @abstractmethod
+    def read(self, num: Optional[int] = None) -> bytes:
+        raise NotImplementedError
 
     @abstractmethod
-    def __next__(self):
-        pass
-
-    @property
-    @abstractmethod
-    def current_offset(self) -> int:
-        # offset in *compressed* data (for HTTP responses), see `SourceConfig.chunk_size`
-        pass
+    def tell(self) -> int:
+        # offset in *compressed* data (for HTTP responses)
+        raise NotImplementedError
 
 
 class _FuncReader(Reader):
-    def __init__(self, size: Optional[int], meta: Optional[Metadata], func_read: Callable[[], bytes], func_get_offset: Callable[[], int]):
+    def __init__(self, size: Optional[int], meta: Optional[Metadata], func_read: Callable[[Optional[int]], bytes], func_get_offset: Callable[[], int]):
         super().__init__(size, meta)
         self.__func_read = func_read
         self.__func_get_offset = func_get_offset
 
-    def __next__(self):
-        data = self.__func_read()
-        if data == b'':
-            raise StopIteration
-        return data
+    def read(self, num: Optional[int] = None) -> bytes:
+        return self.__func_read(num)
 
-    @property
-    def current_offset(self) -> int:
-        # *compressed* size (for HTTP responses), see `SourceConfig.chunk_size`
+    def tell(self) -> int:
         return self.__func_get_offset()
 
 
 class ResponseReader(_FuncReader):
-    def __init__(self, response: requests.Response, chunk_size: int, meta: Optional[Metadata]):
-        res_it = response.iter_content(chunk_size)
+    def __init__(self, response: requests.Response, meta: Optional[Metadata]):
         super().__init__(
             response.raw.length_remaining,
             meta,
-            lambda: next(res_it),
+            functools.partial(response.raw.read, decode_content=True),
             response.raw.tell
         )
 
 
 class IOReader(_FuncReader):
-    def __init__(self, io: BinaryIO, chunk_size: int, meta: Optional[Metadata]):
+    def __init__(self, io: BinaryIO, meta: Optional[Metadata]):
         orig_offset = io.tell()
         size = io.seek(0, os.SEEK_END)
         io.seek(orig_offset, os.SEEK_SET)
@@ -102,7 +95,7 @@ class IOReader(_FuncReader):
         super().__init__(
             size,
             meta,
-            lambda: io.read(chunk_size),
+            cast(Callable[[Optional[int]], bytes], io.read),
             io.tell
         )
 
@@ -121,16 +114,15 @@ class CachingReader(Reader):
         self._tmp_filename = f'{filename}.tmp'
         self.__file = None  # type: Optional[BinaryIO]
 
-    def __next__(self):
-        data = next(self._subreader)
+    def read(self, num: Optional[int] = None) -> bytes:
+        data = self._subreader.read(num)
         if self.__file is None:
             raise RuntimeError('cache file wasn\'t opened')
         self.__file.write(data)
         return data
 
-    @property
-    def current_offset(self) -> int:
-        return self._subreader.current_offset
+    def tell(self) -> int:
+        return self._subreader.tell()
 
     def __enter__(self):
         misc.create_dirs_for_file(self._tmp_filename)
@@ -146,8 +138,7 @@ class CachingReader(Reader):
         write_file = (exc_type is None) or (exc_type in self._store_on_errors)
         if write_file:
             # finish writing in case not everything was read
-            for _ in self:
-                pass
+            shutil.copyfileobj(self, self.__file)
         self.__file.close()
         self.__file = None
 

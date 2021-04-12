@@ -110,11 +110,11 @@ class BaseSource:
                 metadata = reader.Metadata.from_file(meta_path)
 
             with open(cache_path, 'rb') as fc:
-                yield reader.IOReader(fc, self._config.chunk_size, metadata)
+                yield reader.IOReader(fc, metadata)
         else:
             with self.__get_nocache_internal(merged_reqdata, True) as res:
                 metadata = reader.Metadata.from_response(res)
-                res_reader = reader.ResponseReader(res, self._config.chunk_size, metadata)
+                res_reader = reader.ResponseReader(res, metadata)
 
                 # cache data if configured, return basic reader otherwise
                 if self._config.store_to_cache:

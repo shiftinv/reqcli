@@ -12,7 +12,6 @@ class SourceConfig:
     store_to_cache: bool = True
     store_metadata: bool = True
     store_failed_requests: bool = True
-    chunk_size: int = Configuration.default_chunk_size  # note: with streamed requests, this value is the size of compressed chunks (i.e. the size of returned chunks may be larger)
     response_status_checking: StatusCheckMode = StatusCheckMode.REQUIRE_200
     http_retries: int = 3
     requests_per_second: float = 5.0

@@ -18,8 +18,8 @@ def read_object(data: bytes) -> lxml.objectify.ObjectifiedElement:
     return lxml.objectify.parse(io.BytesIO(data)).getroot()
 
 
-def load_from_reader(reader: reader.Reader, root_tag: Optional[str] = None) -> lxml.objectify.ObjectifiedElement:
-    data = reader.read_all()
+def load_from_reader(reader: 'reader.Reader', root_tag: Optional[str] = None) -> lxml.objectify.ObjectifiedElement:
+    data = reader.read()
     tree = read_object(data)
     children = tree.getchildren()
     assert len(children) == 1
