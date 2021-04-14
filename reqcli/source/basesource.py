@@ -53,21 +53,21 @@ class BaseSource:
             self._session.mount('https://', HTTPAdapter(max_retries=retry))
 
     @overload
-    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable) -> _TBaseTypeLoadable:
+    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, *, skip_store_to_cache: bool = False) -> _TBaseTypeLoadable:
         ...
 
     @overload
-    def _create_type(self, reqdata: ReqData) -> UnloadableType:
+    def _create_type(self, reqdata: ReqData, *, skip_store_to_cache: bool = False) -> UnloadableType:
         ...
 
-    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None) -> Union[_TBaseTypeLoadable, UnloadableType]:
+    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None, *, skip_store_to_cache: bool = False) -> Union[_TBaseTypeLoadable, UnloadableType]:
         if loadable is not None:
             # first overload
-            with self.get_reader(reqdata) as reader:
+            with self.get_reader(reqdata, skip_store_to_cache=skip_store_to_cache) as reader:
                 return loadable.load(reader, self._config.type_load_config)
         else:
             # second overload
-            return UnloadableType(self, reqdata)
+            return UnloadableType(self, reqdata, skip_store_to_cache)
 
     def get_nocache(self, reqdata: ReqData) -> requests.Response:
         res = self.__get_nocache_internal(reqdata)
@@ -75,8 +75,8 @@ class BaseSource:
         return res
 
     @contextlib.contextmanager
-    def get_reader(self, reqdata: ReqData) -> Iterator[reader.Reader]:
-        with self.__get_reader_internal(reqdata) as reader:
+    def get_reader(self, reqdata: ReqData, *, skip_store_to_cache: bool = False) -> Iterator[reader.Reader]:
+        with self.__get_reader_internal(reqdata, skip_store_to_cache) as reader:
             if reader.metadata:  # if this is None, request was loaded from cache and successful
                 self.__check_status(reader.metadata)
             yield reader
@@ -98,7 +98,7 @@ class BaseSource:
         return res
 
     @contextlib.contextmanager
-    def __get_reader_internal(self, reqdata: ReqData) -> Iterator[reader.Reader]:
+    def __get_reader_internal(self, reqdata: ReqData, skip_store_to_cache: bool) -> Iterator[reader.Reader]:
         merged_reqdata = self._base_reqdata + reqdata
         cache_path = cachemanager.get_path(merged_reqdata)
         meta_path = cachemanager.get_metadata_path(cache_path)
@@ -117,7 +117,7 @@ class BaseSource:
                 res_reader = reader.ResponseReader(res, metadata)
 
                 # cache data if configured, return basic reader otherwise
-                if self._config.store_to_cache:
+                if (not skip_store_to_cache) and self._config.store_to_cache:
                     # additionally store metadata to separate file
                     if self._config.store_metadata:
                         utils.misc.create_dirs_for_file(meta_path)
