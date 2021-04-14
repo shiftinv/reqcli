@@ -63,40 +63,48 @@ class Reader(ABC, io.IOBase):
         raise NotImplementedError
 
 
-class _FuncReader(Reader):
-    def __init__(self, size: Optional[int], meta: Optional[Metadata], func_read: Callable[[Optional[int]], bytes], func_get_offset: Callable[[], int]):
+class _IOFuncReader(Reader):
+    def __init__(self, io: BinaryIO, size: Optional[int], meta: Optional[Metadata], *, func_read: Optional[Callable[[Optional[int]], bytes]] = None):
         super().__init__(size, meta)
-        self.__func_read = func_read
-        self.__func_get_offset = func_get_offset
+        self.__io = io
+        self.__func_read = func_read or cast(Callable[[Optional[int]], bytes], io.read)
 
     def read(self, num: Optional[int] = None) -> bytes:
         return self.__func_read(num)
 
+    def readable(self) -> bool:
+        return self.__io.readable()
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        return self.__io.seek(offset, whence)
+
+    def seekable(self) -> bool:
+        return self.__io.seekable()
+
     def tell(self) -> int:
-        return self.__func_get_offset()
+        return self.__io.tell()
 
 
-class ResponseReader(_FuncReader):
+class ResponseReader(_IOFuncReader):
     def __init__(self, response: requests.Response, meta: Optional[Metadata]):
         super().__init__(
+            response.raw,
             response.raw.length_remaining,
             meta,
-            functools.partial(response.raw.read, decode_content=True),
-            response.raw.tell
+            func_read=functools.partial(response.raw.read, decode_content=True)
         )
 
 
-class IOReader(_FuncReader):
+class IOReader(_IOFuncReader):
     def __init__(self, io: BinaryIO, meta: Optional[Metadata]):
         orig_offset = io.tell()
         size = io.seek(0, os.SEEK_END)
         io.seek(orig_offset, os.SEEK_SET)
 
         super().__init__(
+            io,
             size,
-            meta,
-            cast(Callable[[Optional[int]], bytes], io.read),
-            io.tell
+            meta
         )
 
 
