@@ -146,7 +146,7 @@ class CachingReader(Reader):
         write_file = (exc_type is None) or (exc_type in self._store_on_errors)
         if write_file:
             # finish writing in case not everything was read
-            shutil.copyfileobj(self, self.__file)
+            shutil.copyfileobj(self._subreader, self.__file)
         self.__file.close()
         self.__file = None
 
