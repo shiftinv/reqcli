@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from requests_cache.backends import BackendSpecifier
 
 
 @dataclass
 class _Configuration:
-    cache_path: str = './cache/'
+    cache_backend: BackendSpecifier = 'sqlite'
+    cache_name: str = './cache/requests.db'
     default_user_agent: str = ''
-    default_chunk_size: int = 32768
 
 
 Configuration = _Configuration()

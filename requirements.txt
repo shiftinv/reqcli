@@ -3,3 +3,6 @@ requests-toolbelt
 lxml
 pathvalidate
 construct
+
+# needs git version until 0.7 is released
+requests-cache @ git+https://github.com/reclosedev/requests-cache

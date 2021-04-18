@@ -1,51 +1,49 @@
+import re
 import time
+import requests
 import threading
-import functools
 import collections
-from typing import Dict, Type, Union, Callable, Any, cast
+import urllib.parse
+import requests_cache
+import requests_cache.backends
+from typing import Dict, Any, cast
 
-from ..utils.typing import TFuncAny
+
+# suppress warnings about unrecognized arguments due to CachedRateLimitedSession
+requests_cache.backends.base.logger.addFilter(lambda r: not re.match(r'Unrecognized keyword arguments: \{\'requests_per_second\': [^,]+\}', r.getMessage()))
 
 
-class limit:
-    _last_call: Dict[Type[Any], float] = collections.defaultdict(lambda: 0)
-    _lock = threading.RLock()
+class RateLimitingMixin:
+    __last_call: Dict[str, float] = collections.defaultdict(lambda: 0)
+    __lock = threading.RLock()
 
-    def __init__(self, calls_per_second: Union[Callable[[Any], float], float] = 1.0):
-        self._calls_per_second = calls_per_second
+    def __init__(self, requests_per_second: float = 1.0, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)  # type: ignore
+        assert requests_per_second > 0
+        self.__interval = 1.0 / requests_per_second
 
-    def __call__(self, func: TFuncAny) -> TFuncAny:
-        @functools.wraps(func)
-        def wrapper(self_inner, *args, **kwargs):
-            self._setup_interval(self_inner)
-            wait_time = self._get_wait_time(type(self_inner))
+    def send(self, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
+        host = urllib.parse.urlparse(cast(str, request.url)).netloc
+        wait_time = self.__get_wait_time(host)
 
-            if wait_time > 0:
-                time.sleep(wait_time)
+        if wait_time > 0:
+            time.sleep(wait_time)
 
-            return func(self_inner, *args, **kwargs)
-        return cast(TFuncAny, wrapper)
+        return super().send(request, **kwargs)  # type: ignore
 
-    def _get_wait_time(self, key: Type[Any]) -> float:
-        with self._lock:
+    def __get_wait_time(self, key: str) -> float:
+        cls = type(self)
+        with cls.__lock:
             # calculate difference to previous call
-            last_time = self._last_call[key]
+            last_time = cls.__last_call[key]
             now = time.time()
             diff = now - last_time
 
             # calculate wait time, update last call time to (future) next call
-            wait_time = max(0, self.interval - diff)
-            self._last_call[key] = now + wait_time
+            wait_time = max(0, self.__interval - diff)
+            cls.__last_call[key] = now + wait_time
             return wait_time
 
-    def _setup_interval(self, self_inner: Any) -> None:
-        with self._lock:
-            if hasattr(self, 'interval'):
-                return
 
-            if isinstance(self._calls_per_second, float):
-                value = self._calls_per_second
-            else:
-                value = self._calls_per_second(self_inner)
-            assert value > 0
-            self.interval = 1.0 / value
+class CachedRateLimitedSession(requests_cache.CacheMixin, RateLimitingMixin, requests.Session):
+    pass

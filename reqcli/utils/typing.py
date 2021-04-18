@@ -1,7 +1,4 @@
-from typing import Mapping, Union, TypeVar, Callable, Any
-
-
-TFuncAny = TypeVar('TFuncAny', bound=Callable[..., Any])
+from typing import Mapping, Union
 
 
 # `Mapping` since `Dict` is invariant in its value type

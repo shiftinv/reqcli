@@ -5,7 +5,6 @@ from construct import Construct
 from typing import Optional, Tuple, Type, TypeVar, Dict, Any, BinaryIO
 
 from .config import TypeLoadConfig
-from ..config import Configuration
 from .. import reader, utils
 
 
@@ -30,7 +29,7 @@ class BaseTypeLoadable(BaseType, ABC):
         return self.load_stream(io.BytesIO(data), config)
 
     def load_stream(self: _T, stream: BinaryIO, config: Optional[TypeLoadConfig] = None) -> _T:
-        return self.load(reader.IOReader(stream, None), config)
+        return self.load(reader.IOReader(stream), config)
 
     def load(self: _T, reader: reader.Reader, config: Optional[TypeLoadConfig] = None) -> _T:
         if self.__loaded:
