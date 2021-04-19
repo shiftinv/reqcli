@@ -1,30 +1,24 @@
-import io
 import lxml.objectify
-from xml.etree import ElementTree as ET
-from typing import Any, Tuple, Set, Dict, Optional, Iterator
+from typing import Any, BinaryIO, Tuple, Set, Dict, Optional, Iterator
 
 from . import dicts
-from .. import reader
+from ..errors import XmlLoadError, XmlSchemaError
 
 
 SchemaType = Dict[str, Any]  # needs `Any` type since there's no support for self-recursive types (yet)
 
 
-def read(data: bytes) -> ET.ElementTree:
-    return ET.parse(io.BytesIO(data))
+def read_object(stream: BinaryIO) -> lxml.objectify.ObjectifiedElement:
+    return lxml.objectify.parse(stream).getroot()
 
 
-def read_object(data: bytes) -> lxml.objectify.ObjectifiedElement:
-    return lxml.objectify.parse(io.BytesIO(data)).getroot()
-
-
-def load_from_reader(reader: 'reader.Reader', root_tag: Optional[str] = None) -> lxml.objectify.ObjectifiedElement:
-    data = reader.read()
-    tree = read_object(data)
+def load_root(stream: BinaryIO, root_tag: Optional[str] = None) -> lxml.objectify.ObjectifiedElement:
+    tree = read_object(stream)
     children = tree.getchildren()
-    assert len(children) == 1
-    if root_tag:
-        assert children[0].tag == root_tag
+    if len(children) != 1:
+        raise XmlLoadError(f'expected xml to have 1 child, found {len(children)}')
+    if root_tag and children[0].tag != root_tag:
+        raise XmlLoadError(f'expected child tag to be {root_tag!r}, found {children[0].tag!r}')
     return children[0]
 
 
@@ -52,7 +46,7 @@ def get_tag_schema(xml: lxml.objectify.ObjectifiedElement) -> Optional[SchemaTyp
 def validate_schema(xml: lxml.objectify.ObjectifiedElement, target_hierarchy: Optional[SchemaType], superset: bool) -> None:
     h = get_tag_schema(xml)
     if (not superset and target_hierarchy != h) or (superset and not dicts.is_dict_subset_deep(h, target_hierarchy)):
-        raise RuntimeError(f'unexpected XML structure\nexpected{" subset of" if superset else ""}:\n\t{target_hierarchy}\ngot:\n\t{h}')
+        raise XmlSchemaError(f'unexpected XML structure\nexpected{" subset of" if superset else ""}:\n\t{target_hierarchy}\ngot:\n\t{h}')
 
 
 def get_child_tags(xml: lxml.objectify.ObjectifiedElement) -> Set[str]:

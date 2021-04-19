@@ -8,3 +8,11 @@ class ResponseStatusError(Exception):
 
 class ConfigDependencyError(Exception):
     pass
+
+
+class XmlLoadError(Exception):
+    pass
+
+
+class XmlSchemaError(Exception):
+    pass
