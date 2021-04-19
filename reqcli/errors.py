@@ -20,3 +20,7 @@ class XmlSchemaError(Exception):
 
 class ReaderError(Exception):
     pass
+
+
+class TypeAlreadyLoadedError(Exception):
+    pass

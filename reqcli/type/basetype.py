@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Type, TypeVar, Dict, Any, BinaryIO
 
 from .config import TypeLoadConfig
 from .. import reader, utils
+from ..errors import TypeAlreadyLoadedError
 
 
 # currently does nothing, but having it could be useful in the future
@@ -33,7 +34,7 @@ class BaseTypeLoadable(BaseType, ABC):
 
     def load(self: _T, reader: reader.Reader, config: Optional[TypeLoadConfig] = None) -> _T:
         if self.__loaded:
-            raise RuntimeError('instance is already loaded')
+            raise TypeAlreadyLoadedError('instance is already loaded')
         if not config:
             config = TypeLoadConfig()  # use default config if none provided
 
@@ -55,7 +56,7 @@ class BaseTypeLoadableConstruct(BaseTypeLoadable):
     def _parse_construct(self, data: bytes, config: TypeLoadConfig) -> Construct:
         return self.__struct.parse(
             data,
-            skip_verify_checksums=not config.verify_checksums
+            **config.construct_kwargs
         )
 
 
