@@ -19,6 +19,9 @@ setup(
     license='Apache 2.0',
     packages=['reqcli'],
     install_requires=read('requirements.txt').splitlines(),
+    extras_require={
+        'dev': ['pytest', 'pytest-cov', 'requests-mock']
+    },
     python_requires='>=3.7',
     classifiers=[
         'Development Status :: 4 - Beta',
