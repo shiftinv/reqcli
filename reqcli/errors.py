@@ -16,3 +16,7 @@ class XmlLoadError(Exception):
 
 class XmlSchemaError(Exception):
     pass
+
+
+class ReaderError(Exception):
+    pass

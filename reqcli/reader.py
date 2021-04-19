@@ -2,17 +2,18 @@ import io
 import os
 import requests
 import functools
-from typing import Callable, Optional, BinaryIO, TYPE_CHECKING
+from typing import Optional, BinaryIO, TYPE_CHECKING
+
+from .errors import ReaderError
 
 
 class Reader(io.IOBase):
     size: Optional[int]
 
-    def __init__(self, stream: BinaryIO, size: Optional[int], func_read: Optional[Callable[[int], bytes]] = None):
+    def __init__(self, stream: BinaryIO, size: Optional[int]):
         self.size = size
 
-        self.read = func_read or stream.read  # type: ignore
-        for func in ('readable', 'seek', 'seekable', 'tell'):
+        for func in ('read', 'readable', 'seek', 'seekable', 'tell'):
             setattr(self, func, getattr(stream, func))
 
     # :/
@@ -32,8 +33,18 @@ class IOReader(Reader):
 
 class ResponseReader(Reader):
     def __init__(self, response: requests.Response):
+        if response.raw.isclosed():
+            raise ReaderError('response stream is already closed; ResponseReader requires `stream=True`')
+
+        size: Optional[int]
+        if 'content-length' in response.headers and 'content-encoding' not in response.headers:
+            size = int(response.headers['content-length'])
+        else:
+            size = None
+
         super().__init__(
             response.raw,
-            response.raw.length_remaining if 'content-encoding' not in response.headers else None,
-            func_read=functools.partial(response.raw.read, decode_content=True)
+            size
         )
+
+        self.read = functools.partial(response.raw.read, decode_content=True)  # type: ignore
