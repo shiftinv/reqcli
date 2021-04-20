@@ -11,11 +11,11 @@ from reqcli.utils import xml
 
 @pytest.fixture()
 def testtype():
-    class TestType(BaseTypeLoadable):
+    class BaseTypeTest(BaseTypeLoadable):
         def _read(self, reader, config):
             self.test_data = reader.read()
             self.test_config = config
-    return TestType()
+    return BaseTypeTest()
 
 
 def test_basetype__load__twice(testtype):
@@ -47,7 +47,7 @@ def test_basetype__load_bytes(testtype):
 
 def test_basetypeconstruct():
     # create types/structs
-    class TestTypeConstruct(BaseTypeLoadableConstruct):
+    class BaseTypeTestConstruct(BaseTypeLoadableConstruct):
         def _read(self, reader, config):
             self.test_construct = self._parse_construct(reader.read(), config)
 
@@ -60,7 +60,7 @@ def test_basetypeconstruct():
     config = TypeLoadConfig(construct_kwargs={'testparam': 42})
 
     # load
-    testtype = TestTypeConstruct(struct)
+    testtype = BaseTypeTestConstruct(struct)
     testtype.load_bytes(b'\x01\x02', config)
 
     assert testtype.test_construct == {'a': 1, 'b': 2, 'param': 42}

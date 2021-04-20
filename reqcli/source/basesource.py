@@ -9,7 +9,7 @@ from typing import Iterator, TypeVar, Union, Optional, overload
 from .config import SourceConfig
 from .reqdata import ReqData
 from .unloadable import UnloadableType
-from .ratelimit import CachedRateLimitedSession
+from .ratelimit import RateLimitedSession, CachedRateLimitedSession
 
 from .. import reader
 from ..config import Configuration
@@ -44,7 +44,9 @@ class BaseSource:
                 requests_per_second=self._config.requests_per_second
             )
         else:
-            self._session = requests.Session()
+            self._session = RateLimitedSession(
+                requests_per_second=self._config.requests_per_second
+            )
 
         self._session.verify = verify_tls
 
@@ -82,15 +84,14 @@ class BaseSource:
             # second overload
             return UnloadableType(self, reqdata, skip_cache)
 
-    def get_nocache(self, reqdata: ReqData) -> requests.Response:
-        res = self.__get_internal(reqdata, True)
+    def get(self, reqdata: ReqData, *, skip_cache: bool = False) -> requests.Response:
+        res = self.__get_internal(reqdata, skip_cache)
         self.__check_status(res)
         return res
 
     @contextlib.contextmanager
     def get_reader(self, reqdata: ReqData, *, skip_cache: bool = False) -> Iterator[reader.Reader]:
-        with self.__get_internal(reqdata, skip_cache) as res:
-            self.__check_status(res)
+        with self.get(reqdata, skip_cache=skip_cache) as res:
             yield reader.ResponseReader(res)
 
     def __get_internal(self, reqdata: ReqData, skip_cache: bool) -> requests.Response:

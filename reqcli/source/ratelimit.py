@@ -10,7 +10,7 @@ from typing import Dict, Any, cast
 
 
 # suppress warnings about unrecognized arguments due to CachedRateLimitedSession
-requests_cache.backends.base.logger.addFilter(lambda r: not re.match(r'Unrecognized keyword arguments: \{\'requests_per_second\': [^,]+\}', r.getMessage()))
+requests_cache.backends.base.logger.addFilter(lambda r: not re.match(r'Unrecognized keyword arguments: \{\'requests_per_second\': [^,]+\}', r.getMessage()))  # pragma: no cover
 
 
 class RateLimitingMixin:
@@ -20,7 +20,7 @@ class RateLimitingMixin:
     def __init__(self, requests_per_second: float = 1.0, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)  # type: ignore
         assert requests_per_second > 0
-        self.__interval = 1.0 / requests_per_second
+        self._ratelimit_interval = 1.0 / requests_per_second
 
     def send(self, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
         host = urllib.parse.urlparse(cast(str, request.url)).netloc
@@ -40,10 +40,14 @@ class RateLimitingMixin:
             diff = now - last_time
 
             # calculate wait time, update last call time to (future) next call
-            wait_time = max(0, self.__interval - diff)
+            wait_time = max(0, self._ratelimit_interval - diff)
             cls.__last_call[key] = now + wait_time
             return wait_time
 
 
-class CachedRateLimitedSession(requests_cache.CacheMixin, RateLimitingMixin, requests.Session):
+class RateLimitedSession(RateLimitingMixin, requests.Session):
+    pass
+
+
+class CachedRateLimitedSession(requests_cache.CacheMixin, RateLimitedSession):
     pass
