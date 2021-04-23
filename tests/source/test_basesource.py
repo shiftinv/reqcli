@@ -3,6 +3,7 @@ from requests_cache import CacheMixin
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import cast
 
+from reqcli.config import Configuration
 from reqcli.type import TypeLoadConfig
 from reqcli.source import SourceConfig, UnloadableType, ReqData
 from reqcli.source.ratelimit import RateLimitedSession, RateLimitingMixin
@@ -96,3 +97,13 @@ def test_config__type_load_config():
     type_load_config = TypeLoadConfig()
     source = _get_source(SourceConfig(type_load_config=type_load_config))
     assert source.get_test().test_config is type_load_config
+
+
+def test_config__type_load_config__global_default():
+
+    class TestConfig(TypeLoadConfig):
+        pass
+
+    Configuration.type_load_config_type = TestConfig
+    source = _get_source(SourceConfig())
+    assert isinstance(source.get_test().test_config, TestConfig)

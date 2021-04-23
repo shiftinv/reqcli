@@ -6,6 +6,7 @@ from typing import Optional, Tuple, Type, TypeVar, Dict, Any, BinaryIO
 
 from .config import TypeLoadConfig
 from .. import reader, utils
+from .. import config as global_config
 from ..errors import TypeAlreadyLoadedError
 
 
@@ -36,7 +37,7 @@ class BaseTypeLoadable(BaseType, ABC):
         if self.__loaded:
             raise TypeAlreadyLoadedError('instance is already loaded')
         if not config:
-            config = TypeLoadConfig()  # use default config if none provided
+            config = global_config.Configuration.type_load_config_type()  # use default config if none provided
 
         self._read(reader, config)
         self.__loaded = True

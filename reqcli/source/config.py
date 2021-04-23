@@ -1,8 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from .status import StatusCheckMode
 from ..type import TypeLoadConfig
+from ..config import Configuration
 
 
 @dataclass(frozen=True)
@@ -12,4 +13,4 @@ class SourceConfig:
     response_status_checking: StatusCheckMode = StatusCheckMode.REQUIRE_200
     http_retries: int = 3
     requests_per_second: float = 5.0
-    type_load_config: TypeLoadConfig = TypeLoadConfig()
+    type_load_config: TypeLoadConfig = field(default_factory=lambda: Configuration.type_load_config_type())
