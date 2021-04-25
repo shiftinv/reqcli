@@ -50,4 +50,16 @@ class ResponseReader(Reader):
             size
         )
 
-        self.read = functools.partial(response.raw.read, decode_content=True)  # type: ignore
+        self.__read = functools.partial(response.raw.read, decode_content=True)
+
+        assert response.raw.tell() == 0
+        self._read_bytes = 0
+
+    def tell(self) -> int:
+        # note: no need to consider calls to seek(), since responses are not seekable
+        return self._read_bytes
+
+    def read(self, n: int = -1) -> bytes:
+        data = self.__read(n)
+        self._read_bytes += len(data)
+        return data

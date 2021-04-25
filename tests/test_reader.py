@@ -1,5 +1,6 @@
 import os
 import io
+import gzip
 import pytest
 import requests
 
@@ -69,3 +70,24 @@ def test_responsereader__stream(requests_mock):
 def test_responsereader__size(requests_mock, headers, size):
     requests_mock.get('http://test', headers=headers)
     assert ResponseReader(requests.get('http://test', stream=True)).size == size
+
+
+def test_responsereader__tell(requests_mock):
+    requests_mock.get('http://test', content=b'response')
+    reader = ResponseReader(requests.get('http://test', stream=True))
+    assert reader.tell() == 0
+    reader.read(5)
+    assert reader.tell() == 5
+
+
+def test_responsereader__tell_encoded(requests_mock):
+    requests_mock.get(
+        'http://test',
+        content=gzip.compress(b'response' + os.urandom(500)),
+        headers={'Content-Encoding': 'gzip'}
+    )
+    reader = ResponseReader(requests.get('http://test', stream=True))
+    assert reader.tell() == 0
+    read_data = reader.read(100)  # read_data is not necessarily 100 bytes
+    assert read_data.startswith(b'response')
+    assert reader.tell() == len(read_data)
