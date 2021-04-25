@@ -14,7 +14,10 @@ class Reader(io.IOBase):
         self.size = size
 
         for func in ('read', 'readable', 'seek', 'seekable', 'tell'):
-            setattr(self, func, getattr(stream, func))
+            # only copy if function does not exist yet or is default value
+            existing_func = getattr(self, func, None)
+            if existing_func is None or existing_func == getattr(super(), func, None):
+                setattr(self, func, getattr(stream, func))
 
     # :/
     if TYPE_CHECKING:
