@@ -1,4 +1,5 @@
 import urllib3
+import logging
 import requests
 import contextlib
 import requests_cache
@@ -18,20 +19,29 @@ from ..type import BaseTypeLoadable
 
 _TBaseTypeLoadable = TypeVar('_TBaseTypeLoadable', bound=BaseTypeLoadable)
 
+_logger = logging.getLogger(__name__)
+
 
 class BaseSource:
     # note: this class is not thread-safe
 
     def __init__(self, base_reqdata: ReqData, config: Optional[SourceConfig], *, verify_tls: bool = True, require_fingerprint: Optional[str] = None):
+        # use supplied config or default
+        if config is None:
+            self._config = SourceConfig()
+            config_str = 'default config'
+        else:
+            self._config = config
+            config_str = f'config {config}'
+
+        _logger.debug(f'Initializing source {type(self).__name__} with reqdata {base_reqdata} and {config_str}')
+
         # build base request data
         self._base_reqdata = ReqData(
             path='',
             headers={'User-Agent': Configuration.default_user_agent}
         )
         self._base_reqdata += base_reqdata
-
-        # use supplied config or default
-        self._config = config if config is not None else SourceConfig()
 
         self._session: Union[requests.Session, CachedRateLimitedSession]
         if self._config.enable_cache:
@@ -64,6 +74,7 @@ class BaseSource:
         if require_fingerprint is not None:
             # FingerprintAdapter passes kwargs to underlying HTTPAdapter
             self._session.mount('https://', FingerprintAdapter(require_fingerprint, max_retries=retry))
+            _logger.debug(f'Using server fingerprint {require_fingerprint!r} for HTTPS connections')
         else:
             self._session.mount('https://', HTTPAdapter(max_retries=retry))
 
@@ -100,8 +111,12 @@ class BaseSource:
         if skip_cache and isinstance(self._session, requests_cache.CacheMixin):
             # not thread-safe
             disable_cache_ctx = self._session.cache_disabled()
+            cache_disabled = True
         else:
             disable_cache_ctx = contextlib.nullcontext()
+            cache_disabled = False
+
+        _logger.debug(f'Sending request {reqdata}' + (' [cache disabled]' if cache_disabled else ''))
 
         with disable_cache_ctx:
             res = self._session.get(
@@ -112,6 +127,9 @@ class BaseSource:
                 stream=True,
                 allow_redirects=False
             )
+
+        if getattr(res, 'from_cache', False):
+            _logger.debug(f'Got cached response for request to {reqdata.path}')
 
         return res
 

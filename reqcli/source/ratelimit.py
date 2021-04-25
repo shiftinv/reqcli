@@ -1,5 +1,6 @@
 import re
 import time
+import logging
 import requests
 import threading
 import collections
@@ -11,6 +12,8 @@ from typing import Dict, Any, cast
 
 # suppress warnings about unrecognized arguments due to CachedRateLimitedSession
 requests_cache.backends.base.logger.addFilter(lambda r: not re.match(r'Unrecognized keyword arguments: \{\'requests_per_second\': [^,]+\}', r.getMessage()))  # pragma: no cover
+
+_logger = logging.getLogger(__name__)
 
 
 class RateLimitingMixin:
@@ -27,6 +30,7 @@ class RateLimitingMixin:
         wait_time = self.__get_wait_time(host)
 
         if wait_time > 0:
+            _logger.info(f'Ratelimiting request to {host}, waiting {wait_time:.2f}s')
             time.sleep(wait_time)
 
         return super().send(request, **kwargs)  # type: ignore
