@@ -34,7 +34,7 @@ def test_unloadable(skip_cache):
 
     assert isinstance(inst, UnloadableType)
     assert inst.reqdata is reqdata
-    assert inst.skip_cache is skip_cache
+    assert inst.kwargs['skip_cache'] is skip_cache
     with inst.get_reader() as reader:
         assert reader.read() == b'response'
 

@@ -1,10 +1,11 @@
 import urllib3
 import logging
 import requests
+import requests.hooks
 import contextlib
 from requests.adapters import HTTPAdapter
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
-from typing import Iterator, TypeVar, Union, Optional, overload
+from typing import Any, Iterator, TypeVar, Union, Optional, overload
 
 from .config import SourceConfig
 from .reqdata import ReqData
@@ -95,21 +96,21 @@ class BaseSource:
             self._session.mount('https://', HTTPAdapter(max_retries=retry))
 
     @overload
-    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, *, skip_cache: bool = False) -> _TBaseTypeLoadable:
+    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, **kwargs: Any) -> _TBaseTypeLoadable:
         ...
 
     @overload
-    def _create_type(self, reqdata: ReqData, *, skip_cache: bool = False) -> UnloadableType:
+    def _create_type(self, reqdata: ReqData, **kwargs: Any) -> UnloadableType:
         ...
 
-    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None, *, skip_cache: bool = False) -> Union[_TBaseTypeLoadable, UnloadableType]:
+    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None, **kwargs: Any) -> Union[_TBaseTypeLoadable, UnloadableType]:
         if loadable is not None:
             # first overload
-            with self.get_reader(reqdata, skip_cache=skip_cache) as reader:
+            with self.get_reader(reqdata, **kwargs) as reader:
                 return loadable.load(reader, self._config.type_load_config)
         else:
             # second overload
-            return UnloadableType(self, reqdata, skip_cache)
+            return UnloadableType(self, reqdata, kwargs)
 
     def get(self, reqdata: ReqData, *, skip_cache: bool = False) -> requests.Response:
         res = self.__get_internal(reqdata, skip_cache)
