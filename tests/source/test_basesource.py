@@ -8,7 +8,7 @@ from reqcli.type import TypeLoadConfig
 from reqcli.source import SourceConfig, UnloadableType, ReqData
 from reqcli.source.ratelimit import RateLimitedSession, RateLimitingMixin
 
-from ..conftest import MOCK_PATH, BaseTypeTest, _get_source
+from ..conftest import MOCK_BASE, MOCK_PATH, BaseTypeTest, _get_source
 
 
 def test_fingerprint():
@@ -57,6 +57,36 @@ def test_skip_cache(skip, expected_cache_status):
         result = source.get(reqdata, skip_cache=skip)
         assert result.from_cache is expected  # type: ignore
         assert result.content == b'response'
+
+
+@pytest.mark.parametrize('skip', (True, False))
+def test_skip_cache_read(skip, requests_mock):
+    path = 'test_skip_cache_read'
+    url = MOCK_BASE + path
+    requests_mock.get(url, [{'text': 'first'}, {'text': 'second'}])
+
+    source = _get_source(None)
+    session = cast(CacheMixin, source._session)
+    reqdata = ReqData(path=path)
+
+    res = source.get(reqdata, skip_cache_read=skip)
+    # response should have been stored in cache either way
+    assert url in session.cache.urls
+    # first response is never from cache
+    assert res.from_cache is False  # type: ignore
+    assert res.text == 'first'
+
+    res = source.get(reqdata, skip_cache_read=skip)
+    # second response should only be from cache if skip_cache_read=False
+    assert res.from_cache is (not skip)  # type: ignore
+    # if skip_cache_read=True, new request should have been sent (and stored)
+    expected_text = 'second' if skip else 'first'
+    assert res.text == expected_text
+
+    # new request with skip_cache_read=False should return same data as previous one
+    res = source.get(reqdata, skip_cache_read=False)
+    assert res.from_cache is True  # type: ignore
+    assert res.text == expected_text
 
 
 # config stuff

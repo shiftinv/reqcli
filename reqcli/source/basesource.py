@@ -3,6 +3,7 @@ import logging
 import requests
 import requests.hooks
 import contextlib
+import requests_cache.backends
 from requests.adapters import HTTPAdapter
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import Any, Iterator, TypeVar, Union, Optional, overload
@@ -20,6 +21,7 @@ from ..type import BaseTypeLoadable
 _TBaseTypeLoadable = TypeVar('_TBaseTypeLoadable', bound=BaseTypeLoadable)
 
 _cache_disabled_hook = 'get_cache_disabled'
+_cache_read_disabled_hook = 'get_read_cache_disabled'
 
 _logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class BaseSource:
             # returns false if request should not be cached
             def filter_fn(r: Union[requests.PreparedRequest, requests.Response]) -> bool:
                 if isinstance(r, requests.PreparedRequest):
-                    return not requests.hooks.dispatch_hook(_cache_disabled_hook, r.hooks, r)
+                    return not requests.hooks.dispatch_hook(_cache_disabled_hook, r.hooks, False)
                 return True
 
             # create cached session
@@ -69,6 +71,7 @@ class BaseSource:
                 fast_save=True,
                 requests_per_second=self._config.requests_per_second
             )
+            CachePatcher.patch(self._session.cache)
         else:
             # create non-cached session
             self._session = RateLimitedSession(
@@ -112,17 +115,17 @@ class BaseSource:
             # second overload
             return UnloadableType(self, reqdata, kwargs)
 
-    def get(self, reqdata: ReqData, *, skip_cache: bool = False) -> requests.Response:
-        res = self.__get_internal(reqdata, skip_cache)
+    def get(self, reqdata: ReqData, *, skip_cache: bool = False, skip_cache_read: bool = False) -> requests.Response:
+        res = self.__get_internal(reqdata, skip_cache, skip_cache_read)
         self.__check_status(res)
         return res
 
     @contextlib.contextmanager
-    def get_reader(self, reqdata: ReqData, *, skip_cache: bool = False) -> Iterator[reader.Reader]:
-        with self.get(reqdata, skip_cache=skip_cache) as res:
+    def get_reader(self, reqdata: ReqData, *, skip_cache: bool = False, skip_cache_read: bool = False) -> Iterator[reader.Reader]:
+        with self.get(reqdata, skip_cache=skip_cache, skip_cache_read=skip_cache_read) as res:
             yield reader.ResponseReader(res)
 
-    def __get_internal(self, reqdata: ReqData, skip_cache: bool) -> requests.Response:
+    def __get_internal(self, reqdata: ReqData, skip_cache: bool, skip_cache_read: bool) -> requests.Response:
         reqdata = self._base_reqdata + reqdata
 
         _logger.debug(f'Sending request {reqdata}' + (' [cache disabled]' if skip_cache else ''))
@@ -134,8 +137,12 @@ class BaseSource:
             cert=reqdata.cert,
             stream=True,
             allow_redirects=False,
-            # used by `filter_fn` for bypassing the cache (see `__init__` above)
-            hooks={_cache_disabled_hook: lambda r: skip_cache}
+            hooks={
+                # used by `filter_fn` for bypassing the cache (see `__init__` above)
+                _cache_disabled_hook: lambda _: skip_cache,
+                # used in patched `cache.create_key` (see `CachePatcher` below)
+                _cache_read_disabled_hook: lambda _: skip_cache_read
+            }
         )
 
         if getattr(res, 'from_cache', False):
@@ -145,3 +152,33 @@ class BaseSource:
 
     def __check_status(self, obj: requests.Response) -> None:
         self._config.response_status_checking.check(obj)
+
+
+class CachePatcher:
+    class ReadDisabledCacheKey(str):
+        pass
+
+    @staticmethod
+    def patch(cache: requests_cache.backends.BaseCache) -> None:
+        # add new key to list of hooks
+        if _cache_read_disabled_hook not in requests.hooks.HOOKS:
+            requests.hooks.HOOKS.append(_cache_read_disabled_hook)
+
+        # patch cache.create_key
+        orig_create_key = cache.create_key
+        def patched_create_key(request, *args, **kwargs):  # noqa
+            cache_key = orig_create_key(request, *args, **kwargs)
+            # wrap cache key if hook returns true
+            if requests.hooks.dispatch_hook(_cache_read_disabled_hook, request.hooks, False):
+                cache_key = CachePatcher.ReadDisabledCacheKey(cache_key)
+            return cache_key
+        cache.create_key = patched_create_key
+
+        # patch cache.get_response
+        orig_get_response = cache.get_response
+        def patched_get_response(cache_key):  # noqa
+            # return None if hook returned true (see above)
+            if isinstance(cache_key, CachePatcher.ReadDisabledCacheKey):
+                return None
+            return orig_get_response(cache_key)
+        cache.get_response = patched_get_response
