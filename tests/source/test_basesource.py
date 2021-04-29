@@ -92,18 +92,21 @@ def test_skip_cache_read(skip, requests_mock):
 # config stuff
 
 def test_config__enable_cache():
-    def get_session(cache):
-        return _get_source(SourceConfig(enable_cache=cache))._session
+    def get(cache):
+        source = _get_source(SourceConfig(enable_cache=cache))
+        return source, source._session
 
     # caching disabled
-    session = get_session(False)
+    source, session = get(False)
     assert isinstance(session, RateLimitingMixin)
     assert not isinstance(session, CacheMixin)
+    source.get_test()
 
     # caching enabled
-    session = get_session(True)
+    source, session = get(True)
     assert isinstance(session, RateLimitingMixin)
     assert isinstance(session, CacheMixin)
+    source.get_test()
 
 
 def test_config__cache_response_codes():

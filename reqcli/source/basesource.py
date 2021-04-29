@@ -45,15 +45,16 @@ class BaseSource:
         )
         self._base_reqdata += base_reqdata
 
+        # always register hooks, even if they might not be used
+        for name in (_cache_disabled_hook, _cache_read_disabled_hook):
+            if name not in requests.hooks.HOOKS:
+                requests.hooks.HOOKS.append(name)
+
         self._session: Union[requests.Session, CachedRateLimitedSession]
         if self._config.enable_cache:
             # this is a hack for disabling the cache for specific requests; adding custom data to `PreparedRequest`
             #  objects through .get/.request is surprisingly difficult (unless I'm missing something very obvious).
             # this could probably be solved with more subclassing and overriding methods, but it would likely be more complex
-
-            # add new key to list of hooks
-            if _cache_disabled_hook not in requests.hooks.HOOKS:
-                requests.hooks.HOOKS.append(_cache_disabled_hook)
 
             # returns false if request should not be cached
             def filter_fn(r: Union[requests.PreparedRequest, requests.Response]) -> bool:
@@ -160,10 +161,6 @@ class CachePatcher:
 
     @staticmethod
     def patch(cache: requests_cache.backends.BaseCache) -> None:
-        # add new key to list of hooks
-        if _cache_read_disabled_hook not in requests.hooks.HOOKS:
-            requests.hooks.HOOKS.append(_cache_read_disabled_hook)
-
         # patch cache.create_key
         orig_create_key = cache.create_key
         def patched_create_key(request, *args, **kwargs):  # noqa
