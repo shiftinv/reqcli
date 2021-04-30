@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def read(filename):
@@ -17,7 +17,7 @@ setup(
     author='shiftinv',
     url='https://github.com/shiftinv/reqcli',
     license='Apache 2.0',
-    packages=['reqcli'],
+    packages=find_packages(exclude=['tests*']),
     install_requires=read('requirements.txt').splitlines(),
     extras_require={
         'dev': ['pytest', 'pytest-cov', 'requests-mock']
