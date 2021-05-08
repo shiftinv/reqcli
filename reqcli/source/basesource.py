@@ -131,7 +131,10 @@ class BaseSource:
         try:
             self.__check_status(res)
         except ResponseStatusError:
-            # always release connection back to pool if error occurred,
+            if self._config.finish_read_on_error:  # pragma: no cover
+                res.raw.read()  # read response to allow reusing connection
+
+            # always release connection back to pool if an error occurred,
             # enables connection reuse for failed requests (since connections are
             #  only released back to the pool once the stream is closed)
             # (note: using res.raw.release_conn() as res.close() would also terminate the connection)
@@ -147,7 +150,7 @@ class BaseSource:
     def __get_internal(self, reqdata: ReqData, skip_cache: bool, skip_cache_read: bool) -> requests.Response:
         reqdata = self._base_reqdata + reqdata
 
-        _logger.debug(f'Sending request {reqdata}' + (' [cache disabled]' if skip_cache else ''))
+        _logger.debug(f'Sending request {reqdata}' + (' [cache disabled]' if self._config.enable_cache and skip_cache else ''))
 
         res = self._session.get(
             url=reqdata.path,
