@@ -45,6 +45,15 @@ def test_get():
     assert result.test_data == b'response'
 
 
+@pytest.mark.parametrize('force, expected_type', [
+    (False, BaseTypeTest),
+    (True, UnloadableType)
+])
+def test_force_unloadable(force, expected_type):
+    source = _get_source(None)
+    assert type(source.get_test(force_unloadable=force)) is expected_type
+
+
 @pytest.mark.parametrize('skip, expected_cache_status', [
     (True, (False, False, False)),
     (False, (False, True, True))

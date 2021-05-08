@@ -48,11 +48,11 @@ class BaseTypeTest(BaseTypeLoadable):
 
 
 class BaseSourceTest(BaseSource):
-    def get_test(self, skip_cache=False):
+    def get_test(self, **kwargs):
         return self._create_type(
             ReqData(path=MOCK_PATH),
             BaseTypeTest(),
-            skip_cache=skip_cache
+            **kwargs
         )
 
 

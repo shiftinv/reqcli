@@ -7,6 +7,7 @@ import requests_cache.backends
 from requests.adapters import HTTPAdapter
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import Any, Iterator, TypeVar, Union, Optional, overload
+from typing_extensions import Literal
 
 from .config import SourceConfig
 from .reqdata import ReqData
@@ -100,15 +101,23 @@ class BaseSource:
             self._session.mount('https://', HTTPAdapter(max_retries=retry))
 
     @overload
-    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, **kwargs: Any) -> _TBaseTypeLoadable:
+    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, *, force_unloadable: Literal[False] = False, **kwargs: Any) -> _TBaseTypeLoadable:  # type: ignore
+        ...
+
+    @overload
+    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, *, force_unloadable: Literal[True] = True, **kwargs: Any) -> UnloadableType:
+        ...
+
+    @overload
+    def _create_type(self, reqdata: ReqData, loadable: _TBaseTypeLoadable, *, force_unloadable: bool = False, **kwargs: Any) -> Union[_TBaseTypeLoadable, UnloadableType]:
         ...
 
     @overload
     def _create_type(self, reqdata: ReqData, **kwargs: Any) -> UnloadableType:
         ...
 
-    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None, **kwargs: Any) -> Union[_TBaseTypeLoadable, UnloadableType]:
-        if loadable is not None:
+    def _create_type(self, reqdata: ReqData, loadable: Optional[_TBaseTypeLoadable] = None, *, force_unloadable: bool = False, **kwargs: Any) -> Union[_TBaseTypeLoadable, UnloadableType]:
+        if loadable is not None and not force_unloadable:
             # first overload
             with self.get_reader(reqdata, **kwargs) as reader:
                 return loadable.load(reader, self._config.type_load_config)
