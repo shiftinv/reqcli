@@ -21,7 +21,7 @@ class Reader(io.IOBase):
 
     # :/
     if TYPE_CHECKING:
-        def read(self, n: int = -1) -> bytes:
+        def read(self, n: Optional[int] = None) -> bytes:
             ...
 
 
@@ -59,7 +59,7 @@ class ResponseReader(Reader):
         # note: no need to consider calls to seek(), since responses are not seekable
         return self._read_bytes
 
-    def read(self, n: int = -1) -> bytes:
+    def read(self, n: Optional[int] = None) -> bytes:
         data = self.__read(n)
         self._read_bytes += len(data)
         return data
