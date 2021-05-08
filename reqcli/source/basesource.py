@@ -17,6 +17,7 @@ from .ratelimit import RateLimitedSession, CachedRateLimitedSession
 from .. import reader
 from ..config import Configuration
 from ..type import BaseTypeLoadable
+from ..errors import ResponseStatusError
 
 
 _TBaseTypeLoadable = TypeVar('_TBaseTypeLoadable', bound=BaseTypeLoadable)
@@ -127,7 +128,15 @@ class BaseSource:
 
     def get(self, reqdata: ReqData, *, skip_cache: bool = False, skip_cache_read: bool = False) -> requests.Response:
         res = self.__get_internal(reqdata, skip_cache, skip_cache_read)
-        self.__check_status(res)
+        try:
+            self.__check_status(res)
+        except ResponseStatusError:
+            # always release connection back to pool if error occurred,
+            # enables connection reuse for failed requests (since connections are
+            #  only released back to the pool once the stream is closed)
+            # (note: using res.raw.release_conn() as res.close() would also terminate the connection)
+            res.raw.release_conn()
+            raise
         return res
 
     @contextlib.contextmanager
