@@ -12,8 +12,8 @@ def reset_ratelimits():
     getattr(RateLimitingMixin, '_RateLimitingMixin__last_call').clear()
 
 
-def new_source(*, base=None, cache=False):
-    return _get_source(SourceConfig(enable_cache=cache, requests_per_second=0.1), base)
+def new_source(*, base=None, cache=False, rps=0.1):
+    return _get_source(SourceConfig(enable_cache=cache, requests_per_second=rps), base)
 
 
 @pytest.mark.no_ratelimit_patch
@@ -54,6 +54,15 @@ def test_cached_nolimit(mock_sleep):
 
     assert source.get(reqdata).from_cache
     assert mock_sleep.call_count == 0
+
+
+@pytest.mark.no_ratelimit_patch
+@patch('time.sleep')
+def test_rps_inf(mock_sleep):
+    source = new_source(rps=float('inf'))
+    for _ in range(10):
+        source.get_test()
+        assert mock_sleep.call_count == 0
 
 
 @pytest.mark.parametrize('rps', (-1, 0))

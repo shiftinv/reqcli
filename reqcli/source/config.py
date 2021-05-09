@@ -13,5 +13,5 @@ class SourceConfig:
     response_status_checking: StatusCheckMode = StatusCheckMode.REQUIRE_200
     http_retries: int = 3
     finish_read_on_error: bool = True
-    requests_per_second: float = 5.0
+    requests_per_second: float = 5.0  # set to `float('inf')` to disable ratelimiting
     type_load_config: TypeLoadConfig = field(default_factory=lambda: Configuration.type_load_config_type())
