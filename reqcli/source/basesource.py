@@ -157,6 +157,7 @@ class BaseSource:
             headers=reqdata.headers,
             params=reqdata.params,
             cert=reqdata.cert,
+            timeout=self._config.timeout,
             stream=True,
             allow_redirects=False,
             hooks={

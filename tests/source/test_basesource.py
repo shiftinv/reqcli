@@ -1,11 +1,12 @@
 import pytest
+from unittest.mock import patch
 from requests_cache import CacheMixin
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import cast
 
 from reqcli.config import Configuration
 from reqcli.type import TypeLoadConfig
-from reqcli.source import SourceConfig, UnloadableType, ReqData
+from reqcli.source import SourceConfig, UnloadableType, ReqData, StatusCheckMode
 from reqcli.source.ratelimit import RateLimitedSession, RateLimitingMixin
 
 from ..conftest import MOCK_BASE, MOCK_PATH, BaseTypeTest, _get_source
@@ -127,6 +128,13 @@ def test_config__http_retries():
     source = _get_source(SourceConfig(http_retries=1337))
     for prefix in ('http://', 'https://'):
         assert source._session.adapters[prefix].max_retries.total == 1337
+
+
+def test_config__timeout():
+    source = _get_source(SourceConfig(timeout=42, response_status_checking=StatusCheckMode.NONE))
+    with patch.object(source._session, 'get') as mock_get:
+        source.get(ReqData(path=MOCK_PATH))
+        assert mock_get.call_args[1]['timeout'] == 42
 
 
 @pytest.mark.parametrize('cached', (True, False))
