@@ -1,4 +1,5 @@
 import pytest
+import requests
 from unittest.mock import patch
 from requests_cache import CacheMixin
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
@@ -59,9 +60,16 @@ def test_force_unloadable(force, expected_type):
     (True, (False, False, False)),
     (False, (False, True, True))
 ])
-def test_skip_cache(skip, expected_cache_status):
+@pytest.mark.parametrize('callable', (True, False))
+def test_skip_cache(skip, expected_cache_status, callable):
     source = _get_source(None)
     reqdata = ReqData(path=MOCK_PATH)
+
+    if callable:
+        skip_val = skip
+        def skip(r):  # noqa
+            assert isinstance(r, requests.PreparedRequest)
+            return skip_val
 
     for expected in expected_cache_status:
         result = source.get(reqdata, skip_cache=skip)

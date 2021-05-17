@@ -6,7 +6,7 @@ import contextlib
 import requests_cache.backends
 from requests.adapters import HTTPAdapter
 from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
-from typing import Any, Iterator, TypeVar, Union, Optional, overload
+from typing import Any, Callable, Iterator, TypeVar, Union, Optional, overload
 from typing_extensions import Literal
 
 from .config import SourceConfig
@@ -21,6 +21,9 @@ from ..errors import ResponseStatusError
 
 
 _TBaseTypeLoadable = TypeVar('_TBaseTypeLoadable', bound=BaseTypeLoadable)
+
+RequestHook = Union[bool, Callable[[requests.PreparedRequest], bool]]
+ResponseHook = Union[bool, Callable[[requests.Response], bool]]
 
 _cache_disabled_hook = 'get_cache_disabled'
 _cache_read_disabled_hook = 'get_read_cache_disabled'
@@ -62,9 +65,11 @@ class BaseSource:
             # returns false if request should not be cached
             def filter_fn(r: Union[requests.PreparedRequest, requests.Response]) -> bool:
                 if isinstance(r, requests.PreparedRequest):
-                    return not requests.hooks.dispatch_hook(_cache_disabled_hook, r.hooks, False)
+                    disabled = requests.hooks.dispatch_hook(_cache_disabled_hook, r.hooks, r)
                 else:
-                    return not requests.hooks.dispatch_hook(_cache_write_disabled_hook, r.request.hooks, False)
+                    disabled = requests.hooks.dispatch_hook(_cache_write_disabled_hook, r.request.hooks, r)
+                assert isinstance(disabled, bool)  # just to be sure
+                return not disabled
 
             # create cached session
             self._session = CachedRateLimitedSession(
@@ -128,7 +133,7 @@ class BaseSource:
             # second overload
             return UnloadableType(self, reqdata, kwargs)
 
-    def get(self, reqdata: ReqData, *, skip_cache: bool = False, skip_cache_read: bool = False, skip_cache_write: bool = False) -> requests.Response:
+    def get(self, reqdata: ReqData, *, skip_cache: RequestHook = False, skip_cache_read: RequestHook = False, skip_cache_write: ResponseHook = False) -> requests.Response:
         res = self.__get_internal(reqdata, skip_cache, skip_cache_read, skip_cache_write)
         try:
             self.__check_status(res)
@@ -145,14 +150,16 @@ class BaseSource:
         return res
 
     @contextlib.contextmanager
-    def get_reader(self, reqdata: ReqData, *, skip_cache: bool = False, skip_cache_read: bool = False, skip_cache_write: bool = False) -> Iterator[reader.Reader]:
+    def get_reader(self, reqdata: ReqData, *, skip_cache: RequestHook = False, skip_cache_read: RequestHook = False, skip_cache_write: ResponseHook = False) -> Iterator[reader.Reader]:
         with self.get(reqdata, skip_cache=skip_cache, skip_cache_read=skip_cache_read, skip_cache_write=skip_cache_write) as res:
             yield reader.ResponseReader(res)
 
-    def __get_internal(self, reqdata: ReqData, skip_cache: bool, skip_cache_read: bool, skip_cache_write: bool) -> requests.Response:
+    def __get_internal(self, reqdata: ReqData, skip_cache: RequestHook, skip_cache_read: RequestHook, skip_cache_write: ResponseHook) -> requests.Response:
         reqdata = self._base_reqdata + reqdata
 
         _logger.debug(f'Sending request {reqdata}' + (' [cache disabled]' if self._config.enable_cache and skip_cache else ''))
+
+        exec_hook = lambda hook, *args: hook(*args) if callable(hook) else hook  # noqa
 
         res = self._session.get(
             url=reqdata.path,
@@ -164,11 +171,11 @@ class BaseSource:
             allow_redirects=False,
             hooks={
                 # used by `filter_fn` for bypassing the cache entirely (see `__init__` above)
-                _cache_disabled_hook: lambda _: skip_cache,
+                _cache_disabled_hook: lambda r: exec_hook(skip_cache, r),
                 # used in patched `cache.create_key` (see `CachePatcher` below)
-                _cache_read_disabled_hook: lambda _: skip_cache_read,
+                _cache_read_disabled_hook: lambda r: exec_hook(skip_cache_read, r),
                 # used by `filter_fn` for bypassing writing to the cache (see `__init__` above)
-                _cache_write_disabled_hook: lambda _: skip_cache_write
+                _cache_write_disabled_hook: lambda r: exec_hook(skip_cache_write, r)
             }
         )
 
@@ -192,7 +199,7 @@ class CachePatcher:
         def patched_create_key(request, *args, **kwargs):  # noqa
             cache_key = orig_create_key(request, *args, **kwargs)
             # wrap cache key if hook returns true
-            if requests.hooks.dispatch_hook(_cache_read_disabled_hook, request.hooks, False):
+            if requests.hooks.dispatch_hook(_cache_read_disabled_hook, request.hooks, request):
                 cache_key = CachePatcher.ReadDisabledCacheKey(cache_key)
             return cache_key
         cache.create_key = patched_create_key
