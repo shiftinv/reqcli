@@ -1,5 +1,4 @@
 requests
-requests-toolbelt
 lxml
 pathvalidate
 construct

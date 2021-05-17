@@ -5,7 +5,6 @@ import requests.hooks
 import contextlib
 import requests_cache.backends
 from requests.adapters import HTTPAdapter
-from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import Any, Callable, Iterator, TypeVar, Union, Optional, overload
 from typing_extensions import Literal
 
@@ -18,6 +17,7 @@ from .. import reader
 from ..config import Configuration
 from ..type import BaseTypeLoadable
 from ..errors import ResponseStatusError
+from ..utils.fingerprint_adapter import FingerprintAdapter
 
 
 _TBaseTypeLoadable = TypeVar('_TBaseTypeLoadable', bound=BaseTypeLoadable)

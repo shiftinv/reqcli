@@ -1,8 +1,10 @@
 import io
 import pytest
+from unittest.mock import patch
 
 from reqcli.utils import dicts, xml
 from reqcli.errors import XmlLoadError, XmlSchemaError
+from reqcli.utils.fingerprint_adapter import FingerprintAdapter
 
 
 # dicts.py
@@ -101,3 +103,15 @@ def test_xml__validate_schema__superset(xml_element):
 def test_xml__get_child_tags(xml_element):
     assert xml.get_child_tags(xml_element) == {'node'}
     assert xml.get_child_tags(xml_element.node) == {'el1', 'el2'}
+
+
+@patch('requests.adapters.proxy_from_url')
+@patch('requests.adapters.PoolManager')
+def test_fingerprint_adapter(mock_poolmanager, mock_proxy):
+    fingerprint = '12:34:ab:cd'
+    adapter = FingerprintAdapter(fingerprint)
+
+    assert mock_poolmanager.call_args[1]['assert_fingerprint'] == fingerprint
+
+    adapter.proxy_manager_for('http://x')
+    assert mock_proxy.call_args[1]['assert_fingerprint'] == fingerprint

@@ -2,13 +2,13 @@ import pytest
 import requests
 from unittest.mock import patch
 from requests_cache import CacheMixin
-from requests_toolbelt.adapters.fingerprint import FingerprintAdapter
 from typing import cast
 
 from reqcli.config import Configuration
 from reqcli.type import TypeLoadConfig
 from reqcli.source import SourceConfig, UnloadableType, ReqData, StatusCheckMode
 from reqcli.source.ratelimit import RateLimitedSession, RateLimitingMixin
+from reqcli.utils.fingerprint_adapter import FingerprintAdapter
 
 from ..conftest import MOCK_BASE, MOCK_PATH, BaseTypeTest, _get_source
 
