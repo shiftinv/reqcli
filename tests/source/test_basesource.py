@@ -99,6 +99,36 @@ def test_skip_cache_read(skip, requests_mock):
     assert res.text == expected_text
 
 
+@pytest.mark.parametrize('skip', (True, False))
+def test_skip_cache_write(skip, requests_mock):
+    path = 'test_skip_cache_write'
+    url = MOCK_BASE + path
+    requests_mock.get(url, [{'text': 'first'}, {'text': 'second'}, {'text': 'third'}])
+
+    source = _get_source(None)
+    session = cast(CacheMixin, source._session)
+    reqdata = ReqData(path=path)
+
+    res = source.get(reqdata, skip_cache_write=True)
+    # response should not be in cache
+    assert url not in session.cache.urls
+    assert res.text == 'first'
+
+    res = source.get(reqdata, skip_cache_write=skip)
+    # second response should be in cache only if skip_cache_write=False
+    assert (url in session.cache.urls) is not skip
+    assert res.from_cache is False  # type: ignore
+    assert res.text == 'second'
+
+    res = source.get(reqdata, skip_cache_write=False)
+    # response should be in cache
+    assert url in session.cache.urls
+    assert res.from_cache is not skip  # type: ignore
+    # if second response was not written to cache, we should've gotten the third one now
+    expected_text = 'third' if skip else 'second'
+    assert res.text == expected_text
+
+
 # config stuff
 
 def test_config__enable_cache():
