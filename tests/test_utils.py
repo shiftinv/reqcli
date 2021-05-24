@@ -3,8 +3,8 @@ import pytest
 from unittest.mock import patch
 
 from reqcli.utils import dicts, xml
-from reqcli.errors import XmlLoadError, XmlSchemaError
 from reqcli.utils.fingerprint_adapter import FingerprintAdapter
+from reqcli.errors import XmlLoadError, XmlSchemaError
 
 
 # dicts.py

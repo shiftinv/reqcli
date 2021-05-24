@@ -150,7 +150,7 @@ class BaseSource:
         return res
 
     @contextlib.contextmanager
-    def get_reader(self, reqdata: ReqData, *, skip_cache: RequestHook = False, skip_cache_read: RequestHook = False, skip_cache_write: ResponseHook = False) -> Iterator[reader.Reader]:
+    def get_reader(self, reqdata: ReqData, *, skip_cache: RequestHook = False, skip_cache_read: RequestHook = False, skip_cache_write: ResponseHook = False) -> Iterator[reader.ResponseReader]:
         with self.get(reqdata, skip_cache=skip_cache, skip_cache_read=skip_cache_read, skip_cache_write=skip_cache_write) as res:
             yield reader.ResponseReader(res)
 
