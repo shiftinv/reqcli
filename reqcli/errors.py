@@ -5,6 +5,9 @@ class ResponseStatusError(Exception):
         super().__init__(message)
         self.status = status
 
+    def __reduce__(self):  # pragma: no cover
+        return (type(self), (*self.args, self.status))
+
 
 class ConfigDependencyError(Exception):
     pass
