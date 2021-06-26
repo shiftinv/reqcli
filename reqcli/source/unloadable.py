@@ -13,6 +13,6 @@ class UnloadableType:
         self.kwargs = kwargs
 
     @contextlib.contextmanager
-    def get_reader(self) -> Iterator[reader.Reader]:
+    def get_reader(self) -> Iterator[reader.ResponseReader]:
         with self.source.get_reader(self.reqdata, **self.kwargs) as reader:
             yield reader

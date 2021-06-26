@@ -7,7 +7,7 @@ from typing import Optional, BinaryIO, TYPE_CHECKING
 from .errors import ReaderError
 
 
-class Reader(io.IOBase):
+class Reader(io.BufferedReader):
     size: Optional[int]
 
     def __init__(self, stream: BinaryIO, size: Optional[int]):
